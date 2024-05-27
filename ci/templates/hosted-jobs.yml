@@ -1,4 +1,27 @@
-jobs:
+trigger:
+  - main
+
+stages:
+- stage: CheckChanges
+  jobs:
+  - job: CheckChanges
+    displayName: 'Check Changes'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: |
+        git diff --name-only HEAD^ HEAD > changed_files.txt
+        echo "##vso[build.addbuildproperty]SOURCE_CODE_CHANGED=true"
+      displayName: 'Check for source code changes'
+      condition: ne(variables['Build.Reason'], 'PullRequest')
+    - script: |
+        git diff --name-only HEAD^ HEAD > changed_files.txt
+        python .ci/check_coverage.py
+      displayName: 'Check for coverage changes'
+      condition: ne(variables['Build.Reason'], 'PullRequest')
+
+- stage: RunTests
+  jobs:
   - job: RunOn
     displayName: "on"
     strategy:
@@ -94,3 +117,13 @@ jobs:
       ARCHIVED_CRASH_LOG: "$(Build.ArtifactStagingDirectory)/questdb-crash-$(Build.SourceBranchName)-$(Build.SourceVersion)-$(System.StageAttempt)-$(Agent.OS)-$(jdk).log"
     steps:
       - template: steps.yml
+
+# Plugin Management
+pluginManagement:
+  plugins:
+    - artifactId: maven-javadoc-plugin
+      configuration:
+        source: 11
+        target: 11
+        quiet: true
+        failOnError: false
